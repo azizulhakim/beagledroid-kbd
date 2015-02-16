@@ -293,7 +293,7 @@ static void usb_kbd_irq(struct urb *urb)
 	}
 
 	printk("Bulk data received\n");
-	printk("%c%c%c%c\n", (char)kbd->new[0], (char)kbd->new[1], (char)kbd->new[2]);
+	printk("%d  %d  %d\n", kbd->new[0], kbd->new[1], kbd->new[2]);
 
 	
 //input_report_key(kbd->dev, BTN_LEFT,   0x01);
@@ -302,23 +302,25 @@ static void usb_kbd_irq(struct urb *urb)
 //	input_report_rel(kbd->dev, REL_X,  50);
 //    input_report_rel(kbd->dev, REL_Y,  50);
 
-/*input_report_key(kbd->dev, 0x04,   0x02);
-input_report_key(kbd->dev, 0x05,   0x03);
-input_report_key(kbd->dev, 0x06,   0x00);
-input_report_key(kbd->dev, 0x07,   0x05);
+	input_report_key(kbd->dev, 0x04,   0x02);
+	input_report_key(kbd->dev, 0x05,   0x03);
+	input_report_key(kbd->dev, 0x06,   0x01);
+	input_report_key(kbd->dev, 0x07,   0x01);
+	input_report_key(kbd->dev, 0x07,   0x00);
 
-for (i=4;i<9; i++){
-	//input_report_key(kbd->dev, i,   0x01);
-}
-input_sync(kbd->dev);
+
+	/*for (i=0; i<4; i++){
+		input_report_key(kbd->dev, usb_kbd_keycode[kbd->new[i]], 1);
+	}
+	input_report_key(kbd->dev, usb_kbd_keycode[kbd->new[i-1]], 0);
 */
-	/*for (i=20;i<100; i++){
-		input_report_key(kbd->dev, usb_kbd_keycode[i + 224], 1);
-	}*/
+	input_report_rel(kbd->dev, REL_X, 100);
+	input_report_rel(kbd->dev, REL_Y, 70);
+	input_sync(kbd->dev);
 
-	for (i = 0; i < 8; i++)
-		input_report_key(kbd->dev, usb_kbd_keycode[i + 224], (kbd->new[0] >> i) & 1);
-
+	/*for (i = 0; i < 8; i++)			// CTRL, SHIFT, ATL, WIN - L/R each
+		input_report_key(kbd->dev, usb_kbd_keycode[i + 224], (kbd->new[0] >> i) & 1);*/
+/*
 	for (i = 2; i < 8; i++) {
 
 		if (kbd->old[i] > 3 && memscan(kbd->new + 2, kbd->old[i], 6) == kbd->new + 8) {
@@ -343,7 +345,7 @@ input_sync(kbd->dev);
 	input_sync(kbd->dev);
 
 	memcpy(kbd->old, kbd->new, 8);
-
+*/
 resubmit:
 	i = usb_submit_urb (urb, GFP_ATOMIC);
 	if (i)
@@ -482,6 +484,11 @@ static int usb_kbd_probe(struct usb_interface *iface,
 
 		if (interface->desc.bNumEndpoints == 0){
 			printk("ERROR!!!\n");
+
+			interface = iface->altsetting;
+			if (interface->desc.bNumEndpoints == 0){
+				printk("paisi tore\n");
+			}
 			return -ENODEV;
 		}
 
@@ -625,10 +632,14 @@ static int usb_kbd_probe(struct usb_interface *iface,
 		input_set_drvdata(input_dev, kbd);
 
 		input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_LED) |
-			BIT_MASK(EV_REP);
+			BIT_MASK(EV_REP) | BIT_MASK(EV_REL);
 		input_dev->ledbit[0] = BIT_MASK(LED_NUML) | BIT_MASK(LED_CAPSL) |
 			BIT_MASK(LED_SCROLLL) | BIT_MASK(LED_COMPOSE) |
 			BIT_MASK(LED_KANA);
+		input_dev->relbit[0] = BIT_MASK(REL_X) | BIT_MASK(REL_Y);
+		input_dev->keybit[BIT_WORD(BTN_MOUSE)] |= BIT_MASK(BTN_SIDE) |
+				BIT_MASK(BTN_EXTRA);
+		input_dev->relbit[0] |= BIT_MASK(REL_WHEEL);
 
 		for (i = 0; i < 255; i++)
 			set_bit(usb_kbd_keycode[i], input_dev->keybit);
@@ -686,7 +697,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 
 		printk("<-----Audio Request------  %d ----------------->\n", SendAudioActivationRequest(dev));
 		SendAOAActivationRequest(dev);
-		printk("<-----HID Request------  %d ----------------->\n", RegisterHID(dev));
+		//printk("<-----HID Request------  %d ----------------->\n", RegisterHID(dev));
 
 
 		//input_report_key(dev, BTN_LEFT,   0x01);
