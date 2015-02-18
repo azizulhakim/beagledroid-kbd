@@ -292,8 +292,8 @@ static void usb_kbd_irq(struct urb *urb)
 		goto resubmit;
 	}
 
-	printk("Bulk data received\n");
-	printk("%d  %d  %d\n", kbd->new[0], kbd->new[1], kbd->new[2]);
+	//printk("Bulk data received\n");
+//	printk("%d  %d  %d\n", kbd->new[0], kbd->new[1], kbd->new[2]);
 
 	
 //input_report_key(kbd->dev, BTN_LEFT,   0x01);
@@ -302,21 +302,29 @@ static void usb_kbd_irq(struct urb *urb)
 //	input_report_rel(kbd->dev, REL_X,  50);
 //    input_report_rel(kbd->dev, REL_Y,  50);
 
-	input_report_key(kbd->dev, 0x04,   0x02);
+	/*input_report_key(kbd->dev, 0x04,   0x02);
 	input_report_key(kbd->dev, 0x05,   0x03);
 	input_report_key(kbd->dev, 0x06,   0x01);
 	input_report_key(kbd->dev, 0x07,   0x01);
-	input_report_key(kbd->dev, 0x07,   0x00);
+	input_report_key(kbd->dev, 0x07,   0x00);*/
 
+	input_report_key(kbd->dev, 32,   0x01);
+	input_report_key(kbd->dev, 32,   0x00);
 
 	/*for (i=0; i<4; i++){
 		input_report_key(kbd->dev, usb_kbd_keycode[kbd->new[i]], 1);
 	}
 	input_report_key(kbd->dev, usb_kbd_keycode[kbd->new[i-1]], 0);
 */
-	input_report_rel(kbd->dev, REL_X, 100);
-	input_report_rel(kbd->dev, REL_Y, 70);
-	input_sync(kbd->dev);
+
+	for (i=0; i<8; i+=2){
+		if (kbd->new[i] != 0 || kbd->new[i+1] != 0){
+			printk("%d %d\n", (int)kbd->new[i], (int)kbd->new[i+1]);
+			input_report_rel(kbd->dev, REL_X, (int)kbd->new[i]);
+			input_report_rel(kbd->dev, REL_Y, (int)kbd->new[i + 1]);
+			input_sync(kbd->dev);
+		}
+	}
 
 	/*for (i = 0; i < 8; i++)			// CTRL, SHIFT, ATL, WIN - L/R each
 		input_report_key(kbd->dev, usb_kbd_keycode[i + 224], (kbd->new[0] >> i) & 1);*/
@@ -480,7 +488,10 @@ static int usb_kbd_probe(struct usb_interface *iface,
 									id->idProduct == 0x2D04 || id->idProduct == 0x2D05)){
 		printk("BEAGLEDROID-KBD:  [%04X:%04X] Connected in AOA mode\n", id->idVendor, id->idProduct);
 
-		interface = iface->cur_altsetting;
+
+		interface = iface->altsetting;
+		/*if (iface->altsetting != NULL)
+			interface = iface->altsetting;
 
 		if (interface->desc.bNumEndpoints == 0){
 			printk("ERROR!!!\n");
@@ -490,10 +501,10 @@ static int usb_kbd_probe(struct usb_interface *iface,
 				printk("paisi tore\n");
 			}
 			return -ENODEV;
-		}
+		}*/
 
 
-		printk("IN->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
+		/*printk("IN->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
 		for (i=0; i<16; i++){
 			endpoint = dev->ep_in[i];
 			
@@ -537,7 +548,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 				if (usb_endpoint_is_isoc_out(endpoint))
 					printk("ISOC OUT\n");
 			}
-		}
+		}*/
 		
 		printk("Alternate Settings = %d\n", iface->num_altsetting);
 
@@ -740,6 +751,7 @@ static struct usb_device_id usb_kbd_id_table [] = {
 	{ USB_DEVICE_INTERFACE_NUMBER(0x18d1, 0x2d05, 3) },*/
 
 
+	{ USB_DEVICE(0x18d1, 0x4e41) },
 	{ USB_DEVICE_AND_INTERFACE_INFO(0x18d1, 0x4e42, 255, 255, 0) },	
 	{ USB_DEVICE_AND_INTERFACE_INFO(0x18d1, 0x2d01, 255, 255, 0) },	
 	{ USB_DEVICE_AND_INTERFACE_INFO(0x18d1, 0x2d04, 255, 255, 0) },
