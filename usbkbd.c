@@ -279,6 +279,7 @@ static void usb_kbd_irq(struct urb *urb)
 {
 	struct usb_kbd *kbd = urb->context;
 	int i;
+	int x, y;
 
 	switch (urb->status) {
 	case 0:			/* success */
@@ -317,11 +318,25 @@ static void usb_kbd_irq(struct urb *urb)
 	input_report_key(kbd->dev, usb_kbd_keycode[kbd->new[i-1]], 0);
 */
 
-	for (i=0; i<8; i+=2){
-		if (kbd->new[i] != 0 || kbd->new[i+1] != 0){
-			printk("%d %d\n", (int)kbd->new[i], (int)kbd->new[i+1]);
-			input_report_rel(kbd->dev, REL_X, (int)kbd->new[i]);
-			input_report_rel(kbd->dev, REL_Y, (int)kbd->new[i + 1]);
+	for (i=0; i<8; i+=4){
+		if (kbd->new[i+1] != 0 || kbd->new[i+3] != 0){
+			printk("%d %d\n", (int)kbd->new[i+1], (int)kbd->new[i+3]);
+
+			if (kbd->new[i] == 1) {
+				input_report_rel(kbd->dev, REL_X, -1 * (int)kbd->new[i+1]);
+			}else
+			{
+				input_report_rel(kbd->dev, REL_X, (int)kbd->new[i+1]);
+			}
+
+			if (kbd->new[i+2]==1){
+				input_report_rel(kbd->dev, REL_Y, -1 * (int)kbd->new[i + 3]);
+			}
+			else
+			{
+				input_report_rel(kbd->dev, REL_Y, (int)kbd->new[i + 3]);
+			}
+
 			input_sync(kbd->dev);
 		}
 	}
@@ -750,7 +765,7 @@ static struct usb_device_id usb_kbd_id_table [] = {
 	{ USB_DEVICE_INTERFACE_NUMBER(0x18d1, 0x2d05, 2) },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x18d1, 0x2d05, 3) },*/
 
-
+	{ USB_DEVICE(0x04e8, 0x6860) }, 
 	{ USB_DEVICE(0x18d1, 0x4e41) },
 	{ USB_DEVICE_AND_INTERFACE_INFO(0x18d1, 0x4e42, 255, 255, 0) },	
 	{ USB_DEVICE_AND_INTERFACE_INFO(0x18d1, 0x2d01, 255, 255, 0) },	
