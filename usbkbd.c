@@ -98,6 +98,9 @@ static const unsigned char usb_kbd_keycode[256] = {
 	150,158,159,128,136,177,178,176,142,152,173,140
 };
 
+static unsigned int DISPLAYHEIGHT = 480;
+static unsigned int DISPLAYWIDTH = 640;
+
 /**
  * struct usb_kbd - state of each attached keyboard
  * @dev:	input device associated with this keyboard
@@ -260,6 +263,9 @@ static int handle_mouse(struct usb_kbd *kbd){
 				x = (int)kbd->new[i+1];
 				y = (int)kbd->new[i+3];
 
+				// x *= (int)(1366 / DISPLAYWIDTH);
+				// y *= (int)(768 / DISPLAYHEIGHT);
+
 				if (kbd->new[i] == 1) {
 					x *= -1;
 				}
@@ -297,6 +303,30 @@ static int handle_keyboard(struct usb_kbd *kbd){
 	return 0;
 }
 
+static int handle_control(struct usb_kbd *kbd){
+	int controlType;
+	int *dataPointer;
+	int i;
+
+	controlType = kbd->new[1];
+
+	for (i=0; i<8; i++)
+		printk("%d  ", (int)kbd->new[i]);
+
+	switch (controlType){
+		case CNTRL_RESOLUTION:
+			dataPointer = (int)((kbd->new[2] << 8) | kbd->new[3]);
+			DISPLAYWIDTH = (int)((kbd->new[4] << 8) | kbd->new[5]);
+
+			printk("height = %d width = %d\n", DISPLAYHEIGHT, DISPLAYWIDTH);
+
+			break;
+			
+		default:
+			break;
+	}
+}
+
 
 static void usb_kbd_irq(struct urb *urb)
 {
@@ -317,7 +347,7 @@ static void usb_kbd_irq(struct urb *urb)
 	}
 
 
-	filterId = kbd->new[0] & 7;
+	filterId = kbd->new[0];
 	switch(filterId){
 		case KEYBOARDCONTROL:
 			// handle keyboard
@@ -331,6 +361,7 @@ static void usb_kbd_irq(struct urb *urb)
 
 		case CONTROLMESSAGE:
 			// handle contorl message
+			handle_control(kbd);
 			break;
 		default:
 			break;

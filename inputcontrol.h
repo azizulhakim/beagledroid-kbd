@@ -1,6 +1,6 @@
 #define KEYBOARDCONTROL		1
 #define MOUSECONTROL		2
-#define CONTROLMESSAGE		4
+#define CONTROLMESSAGE		3
 
 
 #define	MOUSEMOVE			0
@@ -8,3 +8,6 @@
 #define MOUSERIGHT			2
 #define MOUSEDOUBLECLICK	3
 #define MOUSESINGLECLICK	4
+
+
+#define CNTRL_RESOLUTION	1
