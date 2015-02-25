@@ -1,10 +1,14 @@
 /*
- *  Copyright (c) 1999-2001 Vojtech Pavlik
+ *  Copyright (c) 2015 Azizul Hakim
  *
- *  USB HIDBP Keyboard support
- */
-
-/*
+ *  USB Keyboard Support for android device using AOA Protocol
+ *
+ *
+ * This code is originally taken from linux distribution written by
+ * Vojtech Pavlik and modified & accomodated support for beaglebone 
+ * to be compatible with AOA supported android devices.
+ *
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -20,13 +24,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
- 
-
- * This code is originally taken from linux distribution and modified
- * by Azizul Hakim for beaglebone to be compatible with AOA supported
- * android devices.
+ * e-mail - mail your message to <azizulfahim2002@gmail.com>
+ *
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -98,36 +97,6 @@ static const unsigned char usb_kbd_keycode[256] = {
 	 29, 42, 56,125, 97, 54,100,126,164,166,165,163,161,115,114,113,
 	150,158,159,128,136,177,178,176,142,152,173,140
 };
-
-static const unsigned char usb_hid_mouse_report_desc[50] = 
-				{	0x05, 0x01,                    /* USAGE_PAGE (Generic Desktop) */ 
-					0x09, 0x02,                    /* USAGE (Mouse) */ 
-					0xa1, 0x01,                    /* COLLECTION (Application) */ 
-					0x09, 0x01,                    /*   USAGE (Pointer) */ 
-					0xa1, 0x00,                    /*   COLLECTION (Physical) */ 
-					0x05, 0x09,                    /*     USAGE_PAGE (Button) */ 
-					0x19, 0x01,                    /*     USAGE_MINIMUM (Button 1) */ 
-					0x29, 0x03,                    /*     USAGE_MAXIMUM (Button 3) */ 
-					0x15, 0x00,                    /*     LOGICAL_MINIMUM (0) */ 
-					0x25, 0x01,                    /*     LOGICAL_MAXIMUM (1) */ 
-					0x95, 0x03,                    /*     REPORT_COUNT (3) */ 
-					0x75, 0x01,                    /*     REPORT_SIZE (1) */ 
-					0x81, 0x02,                    /*     INPUT (Data,Var,Abs) */ 
-					0x95, 0x01,                    /*     REPORT_COUNT (1) */ 
-					0x75, 0x05,                    /*     REPORT_SIZE (5) */ 
-					0x81, 0x03,                    /*     INPUT (Cnst,Var,Abs) */ 
-					0x05, 0x01,                    /*     USAGE_PAGE (Generic Desktop) */ 
-					0x09, 0x30,                    /*     USAGE (X) */ 
-					0x09, 0x31,                    /*     USAGE (Y) */ 
-					0x15, 0x81,                    /*     LOGICAL_MINIMUM (-127) */ 
-					0x25, 0x7f,                    /*     LOGICAL_MAXIMUM (127) */ 
-					0x75, 0x08,                    /*     REPORT_SIZE (8) */ 
-					0x95, 0x02,                    /*     REPORT_COUNT (2) */ 
-					0x81, 0x06,                    /*     INPUT (Data,Var,Rel) */ 
-					0xc0,                          /*   END_COLLECTION */ 
-					0xc0                           /* END_COLLECTION */ 
-				};
-
 
 /**
  * struct usb_kbd - state of each attached keyboard
@@ -248,20 +217,6 @@ int SendAudioActivationRequest(struct usb_device *usbdev){
 							HZ*5);
 }
 
-int RegisterHID(struct usb_device *usbdev){
-//	Debug_Print("BEAGLEDROID-KBD", "REQ FOR AOA Mode Activation");
-
-	return usb_control_msg(usbdev,
-							usb_sndctrlpipe(usbdev, 0),
-							ACCESSORY_REGISTER_HID,
-							USB_DIR_OUT | USB_TYPE_VENDOR,
-							VAL_HID_MOUSE,
-							sizeof(usb_hid_mouse_report_desc),
-							NULL,
-							0,
-							HZ*5);
-}
-
 int SetConfiguration(struct usb_device *usbdev, char *buffer){
 	//Debug_Print("BEAGLEDROID-KBD", "Get Protocol: AOA version");
 	
@@ -288,9 +243,15 @@ static int handle_mouse(struct usb_kbd *kbd){
 
 	switch(control)
 	{
+		case MOUSEDOUBLECLICK:
+			break;
+		case MOUSESINGLECLICK:
+			break;
 		case MOUSELEFT:
+			input_report_key(kbd->dev, BTN_LEFT,   0x01);
 
 		case MOUSERIGHT:
+			input_report_key(kbd->dev, BTN_RIGHT,  0x01);
 
 		case MOUSEMOVE:
 			if (kbd->new[i+1] != 0 || kbd->new[i+3] != 0){
@@ -324,64 +285,16 @@ static int handle_mouse(struct usb_kbd *kbd){
 }
 
 static int handle_keyboard(struct usb_kbd *kbd){
-	input_report_key(kbd->dev, 32,   0x01);
-	input_report_key(kbd->dev, 32,   0x00);
+	int keyIndex;
 
-	//printk("Bulk data received\n");
-//	printk("%d  %d  %d\n", kbd->new[0], kbd->new[1], kbd->new[2]);
+	keyIndex = kbd->new[2];
+	printk("keyIndex = %d\n", keyIndex);
 
-	
-//input_report_key(kbd->dev, BTN_LEFT,   0x01);
-//input_report_key(kbd->dev, BTN_RIGHT,  0x02);
-
-//	input_report_rel(kbd->dev, REL_X,  50);
-//    input_report_rel(kbd->dev, REL_Y,  50);
-
-	/*input_report_key(kbd->dev, 0x04,   0x02);
-	input_report_key(kbd->dev, 0x05,   0x03);
-	input_report_key(kbd->dev, 0x06,   0x01);
-	input_report_key(kbd->dev, 0x07,   0x01);
-	input_report_key(kbd->dev, 0x07,   0x00);*/
-
-
-	/*for (i=0; i<4; i++){
-		input_report_key(kbd->dev, usb_kbd_keycode[kbd->new[i]], 1);
-	}
-	input_report_key(kbd->dev, usb_kbd_keycode[kbd->new[i-1]], 0);
-*/
-
-
-	/*for (i = 0; i < 8; i++)			// CTRL, SHIFT, ATL, WIN - L/R each
-		input_report_key(kbd->dev, usb_kbd_keycode[i + 224], (kbd->new[0] >> i) & 1);*/
-/*
-	for (i = 2; i < 8; i++) {
-
-		if (kbd->old[i] > 3 && memscan(kbd->new + 2, kbd->old[i], 6) == kbd->new + 8) {
-			if (usb_kbd_keycode[kbd->old[i]])
-				input_report_key(kbd->dev, usb_kbd_keycode[kbd->old[i]], 0);
-			else
-				hid_info(urb->dev,
-					 "Unknown key (scancode %#x) released.\n",
-					 kbd->old[i]);
-		}
-
-		if (kbd->new[i] > 3 && memscan(kbd->old + 2, kbd->new[i], 6) == kbd->old + 8) {
-			if (usb_kbd_keycode[kbd->new[i]])
-				input_report_key(kbd->dev, usb_kbd_keycode[kbd->new[i]], 1);
-			else
-				hid_info(urb->dev,
-					 "Unknown key (scancode %#x) pressed.\n",
-					 kbd->new[i]);
-		}
-	}
-
+	input_report_key(kbd->dev, usb_kbd_keycode[keyIndex], 0x01);
+	input_report_key(kbd->dev, usb_kbd_keycode[keyIndex], 0x00);
 	input_sync(kbd->dev);
 
-	memcpy(kbd->old, kbd->new, 8);
-*/
-
 	return 0;
-
 }
 
 
@@ -749,14 +662,6 @@ static int usb_kbd_probe(struct usb_interface *iface,
 
 		printk("<-----Audio Request------  %d ----------------->\n", SendAudioActivationRequest(dev));
 		SendAOAActivationRequest(dev);
-		//printk("<-----HID Request------  %d ----------------->\n", RegisterHID(dev));
-
-
-		//input_report_key(dev, BTN_LEFT,   0x01);
-		//input_report_key(dev, BTN_RIGHT,  0x01);
-		//input_report_key(dev, BTN_MIDDLE, 0x04);
-		//input_report_key(dev, BTN_SIDE,   0x08);
-		//input_report_key(dev, BTN_EXTRA,  0x10);
 
 		return 0;
 	}
@@ -777,7 +682,6 @@ static void usb_kbd_disconnect(struct usb_interface *intf)
 	if (kbd) {
 		usb_kill_urb(kbd->irq);
 		input_unregister_device(kbd->dev);
-		//usb_kill_urb(kbd->led);
 		usb_kbd_free_mem(interface_to_usbdev(intf), kbd);
 		kfree(kbd);
 	}

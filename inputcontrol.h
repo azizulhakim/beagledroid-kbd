@@ -6,3 +6,5 @@
 #define	MOUSEMOVE			0
 #define MOUSELEFT			1
 #define MOUSERIGHT			2
+#define MOUSEDOUBLECLICK	3
+#define MOUSESINGLECLICK	4
