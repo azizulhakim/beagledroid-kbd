@@ -1,0 +1,8 @@
+#define KEYBOARDCONTROL		1
+#define MOUSECONTROL		2
+#define CONTROLMESSAGE		4
+
+
+#define	MOUSEMOVE			0
+#define MOUSELEFT			1
+#define MOUSERIGHT			2

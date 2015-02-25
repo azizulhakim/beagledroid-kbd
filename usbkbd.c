@@ -38,6 +38,8 @@
 #include <linux/usb/input.h>
 #include <linux/hid.h>
 
+#include "inputcontrol.h"
+
 /*
  * Version Information
  */
@@ -274,24 +276,56 @@ int SetConfiguration(struct usb_device *usbdev, char *buffer){
 			HZ*5);	
 }
 
+static int handle_mouse(struct usb_kbd *kbd){
+	int i = 2;
+	int x,y;
+	int control = 0;
 
-static void usb_kbd_irq(struct urb *urb)
-{
-	struct usb_kbd *kbd = urb->context;
-	int i;
-	int x, y;
+	if (kbd == NULL)
+		goto error;
 
-	switch (urb->status) {
-	case 0:			/* success */
-		break;
-	case -ECONNRESET:	/* unlink */
-	case -ENOENT:
-	case -ESHUTDOWN:
-		return;
-	/* -EPIPE:  should clear the halt */
-	default:		/* error */
-		goto resubmit;
+	control = (int)kbd->new[1];
+
+	switch(control)
+	{
+		case MOUSELEFT:
+
+		case MOUSERIGHT:
+
+		case MOUSEMOVE:
+			if (kbd->new[i+1] != 0 || kbd->new[i+3] != 0){
+				printk("%d %d\n", (int)kbd->new[i+1], (int)kbd->new[i+3]);
+
+				x = (int)kbd->new[i+1];
+				y = (int)kbd->new[i+3];
+
+				if (kbd->new[i] == 1) {
+					x *= -1;
+				}
+
+				if (kbd->new[i+2]==1){
+					y *= -1;
+				}
+
+				input_report_rel(kbd->dev, REL_X, x);
+				input_report_rel(kbd->dev, REL_Y, y);
+				input_sync(kbd->dev);
+			}
+			break;
+
+		default:
+			break;
 	}
+
+	return 0;
+
+	error:
+		return -1;
+}
+
+static int handle_keyboard(struct usb_kbd *kbd){
+	input_report_key(kbd->dev, 32,   0x01);
+	input_report_key(kbd->dev, 32,   0x00);
 
 	//printk("Bulk data received\n");
 //	printk("%d  %d  %d\n", kbd->new[0], kbd->new[1], kbd->new[2]);
@@ -309,8 +343,6 @@ static void usb_kbd_irq(struct urb *urb)
 	input_report_key(kbd->dev, 0x07,   0x01);
 	input_report_key(kbd->dev, 0x07,   0x00);*/
 
-	input_report_key(kbd->dev, 32,   0x01);
-	input_report_key(kbd->dev, 32,   0x00);
 
 	/*for (i=0; i<4; i++){
 		input_report_key(kbd->dev, usb_kbd_keycode[kbd->new[i]], 1);
@@ -318,28 +350,6 @@ static void usb_kbd_irq(struct urb *urb)
 	input_report_key(kbd->dev, usb_kbd_keycode[kbd->new[i-1]], 0);
 */
 
-	for (i=0; i<8; i+=4){
-		if (kbd->new[i+1] != 0 || kbd->new[i+3] != 0){
-			printk("%d %d\n", (int)kbd->new[i+1], (int)kbd->new[i+3]);
-
-			if (kbd->new[i] == 1) {
-				input_report_rel(kbd->dev, REL_X, -1 * (int)kbd->new[i+1]);
-			}else
-			{
-				input_report_rel(kbd->dev, REL_X, (int)kbd->new[i+1]);
-			}
-
-			if (kbd->new[i+2]==1){
-				input_report_rel(kbd->dev, REL_Y, -1 * (int)kbd->new[i + 3]);
-			}
-			else
-			{
-				input_report_rel(kbd->dev, REL_Y, (int)kbd->new[i + 3]);
-			}
-
-			input_sync(kbd->dev);
-		}
-	}
 
 	/*for (i = 0; i < 8; i++)			// CTRL, SHIFT, ATL, WIN - L/R each
 		input_report_key(kbd->dev, usb_kbd_keycode[i + 224], (kbd->new[0] >> i) & 1);*/
@@ -369,6 +379,50 @@ static void usb_kbd_irq(struct urb *urb)
 
 	memcpy(kbd->old, kbd->new, 8);
 */
+
+	return 0;
+
+}
+
+
+static void usb_kbd_irq(struct urb *urb)
+{
+	struct usb_kbd *kbd = urb->context;
+	int filterId;
+	int i;
+
+	switch (urb->status) {
+	case 0:			/* success */
+		break;
+	case -ECONNRESET:	/* unlink */
+	case -ENOENT:
+	case -ESHUTDOWN:
+		return;
+	/* -EPIPE:  should clear the halt */
+	default:		/* error */
+		goto resubmit;
+	}
+
+
+	filterId = kbd->new[0] & 7;
+	switch(filterId){
+		case KEYBOARDCONTROL:
+			// handle keyboard
+			handle_keyboard(kbd);
+			break;
+		case MOUSECONTROL:
+			// handle mouse
+
+			handle_mouse(kbd);
+			break;
+
+		case CONTROLMESSAGE:
+			// handle contorl message
+			break;
+		default:
+			break;
+	}
+
 resubmit:
 	i = usb_submit_urb (urb, GFP_ATOMIC);
 	if (i)
@@ -412,34 +466,6 @@ static int usb_kbd_event(struct input_dev *dev, unsigned int type,
 	spin_unlock_irqrestore(&kbd->leds_lock, flags);
 	
 	return 0;
-}
-
-static void usb_kbd_led(struct urb *urb)
-{
-	unsigned long flags;
-	struct usb_kbd *kbd = urb->context;
-
-	if (urb->status)
-		hid_warn(urb->dev, "led urb status %d received\n",
-			 urb->status);
-
-	spin_lock_irqsave(&kbd->leds_lock, flags);
-
-	if (*(kbd->leds) == kbd->newleds){
-		kbd->led_urb_submitted = false;
-		spin_unlock_irqrestore(&kbd->leds_lock, flags);
-		return;
-	}
-
-	*(kbd->leds) = kbd->newleds;
-	
-	kbd->led->dev = kbd->usbdev;
-	if (usb_submit_urb(kbd->led, GFP_ATOMIC)){
-		hid_err(urb->dev, "usb_submit_urb(leds) failed\n");
-		kbd->led_urb_submitted = false;
-	}
-	spin_unlock_irqrestore(&kbd->leds_lock, flags);
-	
 }
 
 static int usb_kbd_open(struct input_dev *dev)
