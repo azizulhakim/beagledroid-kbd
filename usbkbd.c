@@ -327,6 +327,18 @@ static int handle_control(struct usb_kbd *kbd){
 	}
 }
 
+static int handle_random_key(struct usb_kbd *kbd){
+	int i = 0;
+
+	for (i=47; i<=56; i++){
+		printk("index = %d\n", i);
+		input_report_key(kbd->dev, usb_kbd_keycode[i], 0x01);
+		input_report_key(kbd->dev, usb_kbd_keycode[i], 0x00);
+		printk("\n");
+		input_sync(kbd->dev);
+	}
+}
+
 
 static void usb_kbd_irq(struct urb *urb)
 {
@@ -350,6 +362,9 @@ static void usb_kbd_irq(struct urb *urb)
 	filterId = kbd->new[0];
 	printk("filterId = %d\n", filterId);
 	switch(filterId){
+		case 64:
+			handle_random_key(kbd);
+			break;
 		case KEYBOARDCONTROL:
 			// handle keyboard
 			handle_keyboard(kbd);
