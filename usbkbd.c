@@ -348,6 +348,7 @@ static void usb_kbd_irq(struct urb *urb)
 
 
 	filterId = kbd->new[0];
+	printk("filterId = %d\n", filterId);
 	switch(filterId){
 		case KEYBOARDCONTROL:
 			// handle keyboard
@@ -691,7 +692,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 		SendIdentificationInfo(dev, ID_URI, (char*)URI);
 		SendIdentificationInfo(dev, ID_SERIAL, (char*)SERIAL);
 
-		printk("<-----Audio Request------  %d ----------------->\n", SendAudioActivationRequest(dev));
+		//printk("<-----Audio Request------  %d ----------------->\n", SendAudioActivationRequest(dev));
 		SendAOAActivationRequest(dev);
 
 		return 0;
@@ -730,25 +731,6 @@ static struct usb_device_id usb_kbd_id_table [] = {
 	{ USB_DEVICE(0x18d1, 0x4e41) },
 	{ USB_DEVICE_AND_INTERFACE_INFO(0x18d1, 0x4e42, 255, 255, 0) },	
 	{ USB_DEVICE_AND_INTERFACE_INFO(0x18d1, 0x2d01, 255, 255, 0) },	
-	{ USB_DEVICE_AND_INTERFACE_INFO(0x18d1, 0x2d04, 255, 255, 0) },
-	{ USB_DEVICE_AND_INTERFACE_INFO(0x18d1, 0x2d05, 255, 255, 0) },
-	{ USB_DEVICE_AND_INTERFACE_INFO(0x18d1, 0x2d05, 1, 1, 0) },
-	{ USB_DEVICE_AND_INTERFACE_INFO(0x18d1, 0x2d05, 1, 2, 0) },
-	{ USB_DEVICE_AND_INTERFACE_INFO(0x18d1, 0x2d05, 255, 66, 1) },
-	{ USB_DEVICE_AND_INTERFACE_INFO(0x05c6, 0x6764, 255, 255, 0) },	
-	{ USB_DEVICE_AND_INTERFACE_INFO(0x05c6, 0x6765, 255, 255, 0) },	
-	/*{ USB_DEVICE(0x1005, 0xb113) },
-	{ USB_DEVICE(0x05c6, 0x6765) },	// OnePlus One
-	{ USB_DEVICE(0x04e8, 0x6860) },	// Samsung S4
-	{ USB_DEVICE(0x18d1, 0x4e41) },	// Nexus 7
-	{ USB_DEVICE(0x18d1, 0x4e42) },	// Nexus 7
-	{ USB_DEVICE(0x18d1, 0x2d00) },	// Nexus 7 AOA
-	{ USB_DEVICE(0x18d1, 0x2d01) },	// Nexus 7 AOA
-	{ USB_DEVICE(0x18d1, 0x2d02) },	// Nexus 7 AOA
-	{ USB_DEVICE(0x18d1, 0x2d03) },	// Nexus 7 AOA
-	{ USB_DEVICE(0x18d1, 0x2d04) },	// Nexus 7 AOA
-	{ USB_DEVICE(0x18d1, 0x2d05) },	// Nexus 7 AOA
-	{ USB_DEVICE(0x0bb4, 0x0cb0) },	// HTC wildfire*/
 	{}	/* Terminating entry */
 };
 
