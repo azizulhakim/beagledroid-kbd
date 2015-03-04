@@ -1,11 +1,10 @@
-aBCDE - 4-8
-fghijklm - 9-16
-nopqrstuvwxyz- 17-29
-1234567890 - 30-39
-TAB SPACE - 43 44
--=[]\\;'`,./ - 45-56
-F1-F12 - 58-69
+a-z				- 4-29
+1-9				- 30-38
+0				- 39
+[TAB] [SPACE]	- 43 44
+-=[]\\;'`,./	- 45-56
+F1-F12			- 58-69
 
 SPECIAL
-40-42 - Don't Know
-57 - usb_submit_urb(leds) failed
+40-42			- Don't Know
+57				- CAPS LOCK

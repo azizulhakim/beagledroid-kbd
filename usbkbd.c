@@ -110,39 +110,22 @@ static unsigned int DISPLAYWIDTH = 640;
  *		that are pressed, we are able to see key releases.
  * @irq:	URB for receiving a list of keys that are pressed when a
  *		new key is pressed or a key that was pressed is released.
- * @led:	URB for sending LEDs (e.g. numlock, ...)
- * @newleds:	data that will be sent with the @led URB representing which LEDs
- 		should be on
  * @name:	Name of the keyboard. @dev's name field points to this buffer
  * @phys:	Physical path of the keyboard. @dev's phys field points to this
  *		buffer
  * @new:	Buffer for the @irq URB
- * @cr:		Control request for @led URB
- * @leds:	Buffer for the @led URB
  * @new_dma:	DMA address for @irq URB
- * @leds_dma:	DMA address for @led URB
- * @leds_lock:	spinlock that protects @leds, @newleds, and @led_urb_submitted
- * @led_urb_submitted: indicates whether @led is in progress, i.e. it has been
- *		submitted and its completion handler has not returned yet
- *		without	resubmitting @led
  */
 struct usb_kbd {
 	struct input_dev *dev;
 	struct usb_device *usbdev;
 	unsigned char old[8];
-	struct urb *irq, *led;
-	unsigned char newleds;
+	struct urb *irq;
 	char name[128];
 	char phys[64];
 
 	unsigned char *new;
-	struct usb_ctrlrequest *cr;
-	unsigned char *leds;
 	dma_addr_t new_dma;
-	dma_addr_t leds_dma;
-	
-	spinlock_t leds_lock;
-	bool led_urb_submitted;
 
 };
 
@@ -305,7 +288,7 @@ static int handle_keyboard(struct usb_kbd *kbd){
 
 static int handle_control(struct usb_kbd *kbd){
 	int controlType;
-	int *dataPointer;
+	int dataPointer;
 	int i;
 
 	controlType = kbd->new[1];
@@ -325,18 +308,22 @@ static int handle_control(struct usb_kbd *kbd){
 		default:
 			break;
 	}
+
+	return 0;
 }
 
 static int handle_random_key(struct usb_kbd *kbd){
 	int i = 0;
 
-	for (i=47; i<=56; i++){
+	for (i=57; i<=57; i++){
 		printk("index = %d\n", i);
 		input_report_key(kbd->dev, usb_kbd_keycode[i], 0x01);
 		input_report_key(kbd->dev, usb_kbd_keycode[i], 0x00);
 		printk("\n");
 		input_sync(kbd->dev);
 	}
+
+	return 0;
 }
 
 
@@ -391,43 +378,6 @@ resubmit:
 			kbd->usbdev->devpath, i);
 }
 
-static int usb_kbd_event(struct input_dev *dev, unsigned int type,
-			 unsigned int code, int value)
-{
-	unsigned long flags;
-	struct usb_kbd *kbd = input_get_drvdata(dev);
-
-	if (type != EV_LED)
-		return -1;
-
-	spin_lock_irqsave(&kbd->leds_lock, flags);
-	kbd->newleds = (!!test_bit(LED_KANA,    dev->led) << 3) | (!!test_bit(LED_COMPOSE, dev->led) << 3) |
-		       (!!test_bit(LED_SCROLLL, dev->led) << 2) | (!!test_bit(LED_CAPSL,   dev->led) << 1) |
-		       (!!test_bit(LED_NUML,    dev->led));
-
-	if (kbd->led_urb_submitted){
-		spin_unlock_irqrestore(&kbd->leds_lock, flags);
-		return 0;
-	}
-
-	if (*(kbd->leds) == kbd->newleds){
-		spin_unlock_irqrestore(&kbd->leds_lock, flags);
-		return 0;
-	}
-
-	*(kbd->leds) = kbd->newleds;
-	
-	kbd->led->dev = kbd->usbdev;
-	if (usb_submit_urb(kbd->led, GFP_ATOMIC))
-		pr_err("usb_submit_urb(leds) failed\n");
-	else
-		kbd->led_urb_submitted = true;
-	
-	spin_unlock_irqrestore(&kbd->leds_lock, flags);
-	
-	return 0;
-}
-
 static int usb_kbd_open(struct input_dev *dev)
 {
 	struct usb_kbd *kbd = input_get_drvdata(dev);
@@ -450,13 +400,7 @@ static int usb_kbd_alloc_mem(struct usb_device *dev, struct usb_kbd *kbd)
 {
 	if (!(kbd->irq = usb_alloc_urb(0, GFP_KERNEL)))
 		return -1;
-	if (!(kbd->led = usb_alloc_urb(0, GFP_KERNEL)))
-		return -1;
 	if (!(kbd->new = usb_alloc_coherent(dev, 8, GFP_ATOMIC, &kbd->new_dma)))
-		return -1;
-	if (!(kbd->cr = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL)))
-		return -1;
-	if (!(kbd->leds = usb_alloc_coherent(dev, 1, GFP_ATOMIC, &kbd->leds_dma)))
 		return -1;
 
 	return 0;
@@ -465,10 +409,7 @@ static int usb_kbd_alloc_mem(struct usb_device *dev, struct usb_kbd *kbd)
 static void usb_kbd_free_mem(struct usb_device *dev, struct usb_kbd *kbd)
 {
 	usb_free_urb(kbd->irq);
-	//usb_free_urb(kbd->led);
 	usb_free_coherent(dev, 8, kbd->new, kbd->new_dma);
-	kfree(kbd->cr);
-	//usb_free_coherent(dev, 1, kbd->leds, kbd->leds_dma);
 }
 
 static int usb_kbd_probe(struct usb_interface *iface,
@@ -491,65 +432,6 @@ static int usb_kbd_probe(struct usb_interface *iface,
 
 
 		interface = iface->altsetting;
-		/*if (iface->altsetting != NULL)
-			interface = iface->altsetting;
-
-		if (interface->desc.bNumEndpoints == 0){
-			printk("ERROR!!!\n");
-
-			interface = iface->altsetting;
-			if (interface->desc.bNumEndpoints == 0){
-				printk("paisi tore\n");
-			}
-			return -ENODEV;
-		}*/
-
-
-		/*printk("IN->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
-		for (i=0; i<16; i++){
-			endpoint = dev->ep_in[i];
-			
-			if (endpoint != NULL){
-				if (usb_endpoint_is_int_in(endpoint))
-					printk("INT IN\n");
-				if (usb_endpoint_is_bulk_in(endpoint))
-					printk("BULK IN\n");
-				if (usb_endpoint_is_isoc_in(endpoint))
-					printk("ISOC IN\n");
-			}
-
-			if (endpoint != NULL){
-				if (usb_endpoint_is_int_out(endpoint))
-					printk("INT OUT\n");
-				if (usb_endpoint_is_bulk_out(endpoint))
-					printk("BULK OUT\n");
-				if (usb_endpoint_is_isoc_out(endpoint))
-					printk("ISOC OUT\n");
-			}
-		}
-
-		printk("OUT->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
-		for (i=0; i<16; i++){
-			endpoint = dev->ep_out[i];
-			
-			if (endpoint != NULL){
-				if (usb_endpoint_is_int_in(endpoint))
-					printk("INT IN\n");
-				if (usb_endpoint_is_bulk_in(endpoint))
-					printk("BULK IN\n");
-				if (usb_endpoint_is_isoc_in(endpoint))
-					printk("ISOC IN\n");
-			}
-
-			if (endpoint != NULL){
-				if (usb_endpoint_is_int_out(endpoint))
-					printk("INT OUT\n");
-				if (usb_endpoint_is_bulk_out(endpoint))
-					printk("BULK OUT\n");
-				if (usb_endpoint_is_isoc_out(endpoint))
-					printk("ISOC OUT\n");
-			}
-		}*/
 		
 		printk("Alternate Settings = %d\n", iface->num_altsetting);
 
@@ -610,8 +492,6 @@ static int usb_kbd_probe(struct usb_interface *iface,
 		kbd->usbdev = dev;
 		kbd->dev = input_dev;
 
-		spin_lock_init(&kbd->leds_lock);
-
 		if (dev->manufacturer){
 			strlcpy(kbd->name, dev->manufacturer, sizeof(kbd->name));
 			printk("Manufacturer: %s\n", kbd->name);
@@ -645,9 +525,6 @@ static int usb_kbd_probe(struct usb_interface *iface,
 
 		input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_LED) |
 			BIT_MASK(EV_REP) | BIT_MASK(EV_REL);
-		input_dev->ledbit[0] = BIT_MASK(LED_NUML) | BIT_MASK(LED_CAPSL) |
-			BIT_MASK(LED_SCROLLL) | BIT_MASK(LED_COMPOSE) |
-			BIT_MASK(LED_KANA);
 		input_dev->relbit[0] = BIT_MASK(REL_X) | BIT_MASK(REL_Y);
 		input_dev->keybit[BIT_WORD(BTN_MOUSE)] |= BIT_MASK(BTN_SIDE) |
 				BIT_MASK(BTN_EXTRA);
@@ -657,7 +534,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 			set_bit(usb_kbd_keycode[i], input_dev->keybit);
 		clear_bit(0, input_dev->keybit);
 
-		input_dev->event = usb_kbd_event;
+		//input_dev->event = usb_kbd_event;
 		input_dev->open = usb_kbd_open;
 		input_dev->close = usb_kbd_close;
 
@@ -668,18 +545,6 @@ static int usb_kbd_probe(struct usb_interface *iface,
 
 		kbd->irq->transfer_dma = kbd->new_dma;
 		kbd->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
-
-		kbd->cr->bRequestType = USB_TYPE_CLASS | USB_RECIP_INTERFACE;
-		kbd->cr->bRequest = 0x09;
-		kbd->cr->wValue = cpu_to_le16(0x200);
-		kbd->cr->wIndex = cpu_to_le16(interface->desc.bInterfaceNumber);
-		kbd->cr->wLength = cpu_to_le16(1);
-
-		/*usb_fill_control_urb(kbd->led, dev, usb_sndctrlpipe(dev, 0),
-					 (void *) kbd->cr, kbd->leds, 1,
-					 usb_kbd_led, kbd);
-		kbd->led->transfer_dma = kbd->leds_dma;
-		kbd->led->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;*/
 
 		error = input_register_device(kbd->dev);
 		if (error)
