@@ -1,4 +1,4 @@
-8 Bits
+8 Bits For Mouse/Keyboard Data Representation
 
  ----------------------------------------------
 | TYPE | SUBTYPE | X0 | X1 | X2 | X3 | X4 | X5 |

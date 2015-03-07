@@ -234,11 +234,20 @@ static int handle_mouse(struct usb_kbd *kbd){
 		case MOUSESINGLECLICK:
 			break;
 		case MOUSELEFT:
+			printk("Left\n");
 			input_report_key(kbd->dev, BTN_LEFT,   0x01);
+			input_sync(kbd->dev);
+			input_report_key(kbd->dev, BTN_LEFT,   0x00);
+			input_sync(kbd->dev);
+			break;
 
 		case MOUSERIGHT:
+			printk("Right\n");
 			input_report_key(kbd->dev, BTN_RIGHT,  0x01);
-
+			input_sync(kbd->dev);
+			input_report_key(kbd->dev, BTN_RIGHT,  0x00);
+			input_sync(kbd->dev);
+			break;
 		case MOUSEMOVE:
 			if (kbd->new[i+1] != 0 || kbd->new[i+3] != 0){
 				printk("%d %d\n", (int)kbd->new[i+1], (int)kbd->new[i+3]);
@@ -456,6 +465,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 		/*if (!usb_endpoint_is_int_in(endpoint))
 			return -ENODEV;*/
 
+
 		for(i=0; i<interface->desc.bNumEndpoints; i++){
 			endpoint = &interface->endpoint[i].desc;
 
@@ -525,9 +535,15 @@ static int usb_kbd_probe(struct usb_interface *iface,
 
 		input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_LED) |
 			BIT_MASK(EV_REP) | BIT_MASK(EV_REL);
+
+		input_dev->keybit[BIT_WORD(BTN_MOUSE)] = BIT_MASK(BTN_LEFT) |
+                 BIT_MASK(BTN_RIGHT) | BIT_MASK(BTN_MIDDLE);
+
 		input_dev->relbit[0] = BIT_MASK(REL_X) | BIT_MASK(REL_Y);
+
 		input_dev->keybit[BIT_WORD(BTN_MOUSE)] |= BIT_MASK(BTN_SIDE) |
 				BIT_MASK(BTN_EXTRA);
+
 		input_dev->relbit[0] |= BIT_MASK(REL_WHEEL);
 
 		for (i = 0; i < 255; i++)
