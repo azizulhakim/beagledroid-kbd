@@ -1,11 +1,11 @@
 /*
  *  Copyright (c) 2015 Azizul Hakim
  *
- *  USB Keyboard Support for android device using AOA Protocol
+ *  USB Keyboard, Mouse Support for android device using AOA Protocol
  *
  *
- * This code is originally taken from linux distribution written by
- * Vojtech Pavlik and modified & accomodated support for beaglebone 
+ * Special thanks to Vojtech Pavlik, the writer of linux USB Keyboard
+ * and mouse driver whose work helped me to accomodate support for beaglebone 
  * to be compatible with AOA supported android devices.
  *
  *
@@ -44,7 +44,7 @@
  */
 #define DRIVER_VERSION ""
 #define DRIVER_AUTHOR "Azizul Hakim <azizulfahim2002@gmail.com>"
-#define DRIVER_DESC "USB HID Boot Protocol keyboard driver"
+#define DRIVER_DESC "BeagleBoard USB Mouse Keyboard Driver for Android Device"
 #define DRIVER_LICENSE "GPL"
 
 #define REQ_GET_PROTOCOL				51
@@ -58,9 +58,9 @@
 
 #define MANU	"IsonProjects"
 #define MODEL	"BeagleDroid"
-#define DESCRIPTION	"BEAGLEBOARD-ANDROID KEYBOARD MONITOR DRIVER"
+#define DESCRIPTION	"BeagleBoard USB Mouse Keyboard Driver for Android Device"
 #define VERSION	"1.0"
-#define URI		"www.google.com"
+#define URI		"http://beagleboard.org/"
 #define SERIAL	"10"
 
 #define ID_MANU		0
@@ -426,10 +426,10 @@ static int usb_kbd_probe(struct usb_interface *iface,
 {
 	struct usb_device *dev = interface_to_usbdev(iface);
 	struct usb_host_interface *interface;
-	struct usb_endpoint_descriptor *endpoint;
+	struct usb_endpoint_descriptor *endpoint = NULL;
 	struct usb_kbd *kbd;
 	struct input_dev *input_dev;
-	int i, pipe, maxp;
+	int i, pipe = 0;
 	int error = -ENOMEM;
 	u8 data[8];
 	int datalen = 0;
@@ -440,47 +440,14 @@ static int usb_kbd_probe(struct usb_interface *iface,
 		printk("BEAGLEDROID-KBD:  [%04X:%04X] Connected in AOA mode\n", id->idVendor, id->idProduct);
 
 
-		interface = iface->altsetting;
-		
-		printk("Alternate Settings = %d\n", iface->num_altsetting);
-
-		endpoint = &interface->endpoint[0].desc;
-		if (usb_endpoint_is_int_in(endpoint))
-			printk("INT IN\n");
-		if (usb_endpoint_is_bulk_in(endpoint))
-			printk("BULK IN\n");
-		if (usb_endpoint_is_isoc_in(endpoint))
-			printk("ISOC IN\n");
-
-		endpoint = &interface->endpoint[1].desc;
-		if (usb_endpoint_is_int_out(endpoint))
-			printk("INT OUT\n");
-		if (usb_endpoint_is_bulk_out(endpoint))
-			printk("BULK OUT\n");
-		if (usb_endpoint_is_isoc_out(endpoint))
-			printk("ISOC OUT\n");
-
-
-
-		/*if (!usb_endpoint_is_int_in(endpoint))
-			return -ENODEV;*/
-
+		interface = iface->cur_altsetting;
 
 		for(i=0; i<interface->desc.bNumEndpoints; i++){
 			endpoint = &interface->endpoint[i].desc;
 
-			/*if (!andromon_usb->bulk_out_endpointAddr &&
-				((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_OUT) && 
-				(endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == USB_ENDPOINT_XFER_BULK
-			   ){
-					andromon_usb->bulk_out_endpointAddr = endpoint->bEndpointAddress;
-					Debug_Print("ANDROMON", "Bulk out endpoint");
-				}*/
-
 			if (((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_IN) && 
 				(endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == USB_ENDPOINT_XFER_BULK
 			   ){
-					//andromon_usb->bulk_in_endpointAddr = endpoint->bEndpointAddress;
 					printk("BEAGLEDROID: Bulk in endpoint\n");
 					break;
 				}
@@ -489,7 +456,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 
 
 		pipe = usb_rcvbulkpipe(dev, endpoint->bEndpointAddress);
-		maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));
+		//maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));
 
 		kbd = kzalloc(sizeof(struct usb_kbd), GFP_KERNEL);
 		input_dev = input_allocate_device();
@@ -515,7 +482,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 
 		if (!strlen(kbd->name)){
 			snprintf(kbd->name, sizeof(kbd->name),
-				 "USB HIDBP Keyboard %04x:%04x",
+				 "BeagleBoard USB Mouse Keyboard %04x:%04x",
 				 le16_to_cpu(dev->descriptor.idVendor),
 				 le16_to_cpu(dev->descriptor.idProduct));
 
@@ -550,13 +517,12 @@ static int usb_kbd_probe(struct usb_interface *iface,
 			set_bit(usb_kbd_keycode[i], input_dev->keybit);
 		clear_bit(0, input_dev->keybit);
 
-		//input_dev->event = usb_kbd_event;
 		input_dev->open = usb_kbd_open;
 		input_dev->close = usb_kbd_close;
 
 
 		usb_fill_int_urb(kbd->irq, dev, pipe,
-				 kbd->new, (maxp > 8 ? 8 : maxp),
+				 kbd->new, 8,
 				 usb_kbd_irq, kbd, endpoint->bInterval);
 
 		kbd->irq->transfer_dma = kbd->new_dma;
@@ -617,14 +583,7 @@ static void usb_kbd_disconnect(struct usb_interface *intf)
 
 // information is obtained using "lsusb" at the command line
 static struct usb_device_id usb_kbd_id_table [] = {
-	/*{ USB_DEVICE(0x18d1, 0x4e42) },
-	{ USB_DEVICE_INTERFACE_NUMBER(0x18d1, 0x2d05, 0) },
-	{ USB_DEVICE_INTERFACE_NUMBER(0x18d1, 0x2d05, 1) },
-	{ USB_DEVICE_INTERFACE_NUMBER(0x18d1, 0x2d05, 2) },
-	{ USB_DEVICE_INTERFACE_NUMBER(0x18d1, 0x2d05, 3) },*/
-
-	{ USB_DEVICE(0x04e8, 0x6860) }, 
-	{ USB_DEVICE(0x18d1, 0x4e41) },
+	{ USB_DEVICE_AND_INTERFACE_INFO(0x18d1, 0x4e41, 255, 255, 0) },	
 	{ USB_DEVICE_AND_INTERFACE_INFO(0x18d1, 0x4e42, 255, 255, 0) },	
 	{ USB_DEVICE_AND_INTERFACE_INFO(0x18d1, 0x2d01, 255, 255, 0) },	
 	{}	/* Terminating entry */
